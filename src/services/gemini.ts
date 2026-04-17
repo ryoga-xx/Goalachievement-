@@ -171,7 +171,7 @@ export async function chatWithSosCoach(history: {role: string, text: string}[], 
       model: 'gemini-2.5-pro',
       contents: [...formattedHistory, { role: 'user', parts: [{ text: message }] }],
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION + "\\n現在はSOSモードです。ユーザーの不安や焦りを受容し、感情を吐き出させ、客観視させるための短い対話を行ってください。",
+        systemInstruction: SYSTEM_INSTRUCTION + "\n現在はSOSモードです。ユーザーの不安や焦りを受容し、感情を吐き出させ、客観視させるための短い対話を行ってください。",
         temperature: 0.7,
       }
     });
@@ -183,5 +183,41 @@ export async function chatWithSosCoach(history: {role: string, text: string}[], 
       return "（現在APIの利用制限に達しているため、AIの応答ができません。深呼吸して、少し時間を置いてから再度お話ししましょう。）";
     }
     return "エラーが発生しました。";
+  }
+}
+
+export async function chatWithLogCoach(logs: any[], history: {role: string, text: string}[], message: string) {
+  const formattedLogs = logs.map(log => {
+    const date = log.date instanceof Date ? log.date.toLocaleDateString('ja-JP') : log.date;
+    const moodEmojis = ["", "😖", "😕", "😐", "🙂", "🤩"];
+    const moodBefore = moodEmojis[log.before] || log.before;
+    const moodAfter = moodEmojis[log.after] || log.after;
+    return `[${date}] 行動前気分: ${moodBefore}, 行動後気分: ${moodAfter}, 気づき: ${log.reflection || 'なし'}`;
+  }).join('\n');
+
+  const formattedHistory = history.map(h => ({
+    role: h.role === 'user' ? 'user' : 'model',
+    parts: [{ text: h.text }]
+  }));
+
+  const systemInstruction = `${SYSTEM_INSTRUCTION}\n現在は「振り返り分析コーチ」モードです。以下のユーザーの行動ログ（気分変化や自省の気づき）を参照し、質問に丁寧に答えてください。\nユーザーのログデータ:\n${formattedLogs || '現在、ログデータはありません。'}`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      contents: [...formattedHistory, { role: 'user', parts: [{ text: message }] }],
+      config: {
+        systemInstruction: systemInstruction,
+        temperature: 0.7,
+      }
+    });
+
+    return response.text || "エラーが発生しました。";
+  } catch (e: any) {
+    console.error("API Error in chatWithLogCoach:", e);
+    if (e?.status === 429 || e?.message?.includes("429") || e?.message?.includes("quota")) {
+      return "（現在APIの利用制限に達しているため、AIの応答ができません。しばらく待ってから再度ご質問ください。）";
+    }
+    return "コーチへの接続に失敗しました。";
   }
 }

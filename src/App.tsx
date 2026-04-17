@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import confetti from 'canvas-confetti';
-import { getEmpathyAndNextQuestion, generateDashboardData, chatWithSosCoach, generateVisionImageKeyword, analyzeGoalsAndHabits, generateCelebrationNote } from './services/gemini';
+import { getEmpathyAndNextQuestion, generateDashboardData, chatWithSosCoach, chatWithLogCoach, generateVisionImageKeyword, analyzeGoalsAndHabits, generateCelebrationNote } from './services/gemini';
 
 export default function App() {
   const [appPhase, setAppPhase] = useState<'onboarding' | 'dashboard'>('onboarding');
@@ -407,6 +407,12 @@ export default function App() {
   const [isSosLoading, setIsSosLoading] = useState(false);
   const sosChatEndRef = useRef<HTMLDivElement>(null);
 
+  // Log Coach State
+  const [logCoachHistory, setLogCoachHistory] = useState<{role: string, text: string}[]>([]);
+  const [logCoachInput, setLogCoachInput] = useState('');
+  const [isLogCoachLoading, setIsLogCoachLoading] = useState(false);
+  const logCoachEndRef = useRef<HTMLDivElement>(null);
+
   // Initialize Onboarding
   useEffect(() => {
     if (appPhase === 'onboarding' && onboardingHistory.length === 0) {
@@ -421,6 +427,10 @@ export default function App() {
   useEffect(() => {
     sosChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [sosHistory, isSosModalOpen, isSosLoading]);
+
+  useEffect(() => {
+    logCoachEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [logCoachHistory, isLogCoachLoading]);
 
   const startOnboarding = async () => {
     setIsOnboardingLoading(true);
@@ -482,6 +492,25 @@ export default function App() {
       console.error(e);
     }
     setIsSosLoading(false);
+  };
+
+  const handleLogCoachSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logCoachInput.trim() || isLogCoachLoading) return;
+
+    const userMessage = logCoachInput.trim();
+    setLogCoachInput('');
+    const newHistory = [...logCoachHistory, { role: 'user', text: userMessage }];
+    setLogCoachHistory(newHistory);
+    setIsLogCoachLoading(true);
+
+    try {
+      const response = await chatWithLogCoach(dailyLogs, newHistory, userMessage);
+      setLogCoachHistory(prev => [...prev, { role: 'model', text: response }]);
+    } catch (e) {
+      console.error(e);
+    }
+    setIsLogCoachLoading(false);
   };
 
   const openSosModal = (initialMessage?: string) => {
@@ -1142,6 +1171,61 @@ export default function App() {
                 </div>
               </div>
             )}
+          </section>
+
+          {/* AI Log Coach Section */}
+          <section className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-outline-variant/10 flex flex-col h-[500px]">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="material-symbols-outlined text-primary text-xl">psychology</span>
+              <h3 className="font-headline text-lg font-bold text-primary">振り返りコーチに質問する</h3>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2">
+              {logCoachHistory.length === 0 ? (
+                <div className="text-center text-on-surface-variant my-8 text-sm flex flex-col items-center">
+                  <span className="material-symbols-outlined text-4xl mb-3 opacity-50">forum</span>
+                  <p>「最近の傾向はどうなってる？」<br />「もっとモチベーションを上げるには？」</p>
+                  <p className="mt-2 text-xs opacity-70">これまでの行動ログをもとに、コーチが客観的な気づきを提供します。</p>
+                </div>
+              ) : (
+                logCoachHistory.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-primary text-on-primary rounded-br-sm' : 'bg-surface-container-high text-on-surface rounded-bl-sm border border-outline-variant/10'}`}>
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+              {isLogCoachLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-surface-container-high p-4 rounded-2xl rounded-bl-sm flex gap-2 items-center">
+                    <div className="w-2 h-2 bg-primary/50 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-primary/50 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-primary/50 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                </div>
+              )}
+              <div ref={logCoachEndRef} />
+            </div>
+
+            <form onSubmit={handleLogCoachSubmit} className="flex gap-3 items-end mt-auto pt-4 border-t border-outline-variant/20">
+              <textarea
+                value={logCoachInput}
+                onChange={e => setLogCoachInput(e.target.value)}
+                onKeyDown={e => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    handleLogCoachSubmit(e as any);
+                  }
+                }}
+                disabled={isLogCoachLoading}
+                placeholder="コーチに聞いてみましょう... (改行: Enter / 送信: Cmd+Enter)"
+                rows={2}
+                className="flex-1 bg-surface-container border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary resize-y"
+              />
+              <button type="submit" disabled={isLogCoachLoading || !logCoachInput.trim()} className="bg-primary text-on-primary w-11 h-11 rounded-full flex items-center justify-center shrink-0 hover:scale-105 transition-transform disabled:opacity-50">
+                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>send</span>
+              </button>
+            </form>
           </section>
 
         </main>
