@@ -32,16 +32,24 @@ export async function getEmpathyAndNextQuestion(history: {role: string, text: st
   const prompt = `ユーザーが質問に回答しました。まずはユーザーの最新の回答に対して「共感・受容」のメッセージを1〜2文で返してください。その後、次の質問を提示してください。
   次の質問: ${nextQuestion}`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-pro',
-    contents: [...formattedHistory, { role: 'user', parts: [{ text: prompt }] }],
-    config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
-      temperature: 0.7,
-    }
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      contents: [...formattedHistory, { role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        temperature: 0.7,
+      }
+    });
 
-  return response.text || nextQuestion;
+    return response.text || nextQuestion;
+  } catch (e: any) {
+    console.error("API Error in getEmpathyAndNextQuestion:", e);
+    if (e?.status === 429 || e?.message?.includes("429") || e?.message?.includes("quota")) {
+      return "（APIの利用制限に達しました。しばらく経ってから再度お試しください。）\n\n" + nextQuestion;
+    }
+    return nextQuestion;
+  }
 }
 
 export async function generateDashboardData(history: {role: string, text: string}[]) {
@@ -74,19 +82,25 @@ export async function generateDashboardData(history: {role: string, text: string
   }
   必ず上記のJSONフォーマットのみを出力してください。マークダウンブロック（\`\`\`json など）は含めないでください。`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-pro',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      temperature: 0.7,
-    }
-  });
-
   try {
-    return JSON.parse(response.text || "{}");
-  } catch (e) {
-    console.error("Failed to parse JSON:", response.text);
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.7,
+      }
+    });
+
+    try {
+      return JSON.parse(response.text || "{}");
+    } catch (e) {
+      console.error("Failed to parse JSON:", response.text);
+      return {};
+    }
+  } catch (e: any) {
+    console.error("API Error in generateDashboardData:", e);
+    // Return empty object on quota error to let the UI create an empty dashboard
     return {};
   }
 }
@@ -152,14 +166,22 @@ export async function chatWithSosCoach(history: {role: string, text: string}[], 
     parts: [{ text: h.text }]
   }));
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-pro',
-    contents: [...formattedHistory, { role: 'user', parts: [{ text: message }] }],
-    config: {
-      systemInstruction: SYSTEM_INSTRUCTION + "\\n現在はSOSモードです。ユーザーの不安や焦りを受容し、感情を吐き出させ、客観視させるための短い対話を行ってください。",
-      temperature: 0.7,
-    }
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      contents: [...formattedHistory, { role: 'user', parts: [{ text: message }] }],
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION + "\\n現在はSOSモードです。ユーザーの不安や焦りを受容し、感情を吐き出させ、客観視させるための短い対話を行ってください。",
+        temperature: 0.7,
+      }
+    });
 
-  return response.text || "エラーが発生しました。";
+    return response.text || "エラーが発生しました。";
+  } catch (e: any) {
+    console.error("API Error in chatWithSosCoach:", e);
+    if (e?.status === 429 || e?.message?.includes("429") || e?.message?.includes("quota")) {
+      return "（現在APIの利用制限に達しているため、AIの応答ができません。深呼吸して、少し時間を置いてから再度お話ししましょう。）";
+    }
+    return "エラーが発生しました。";
+  }
 }

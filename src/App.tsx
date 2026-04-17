@@ -527,16 +527,21 @@ export default function App() {
           <div ref={chatEndRef} />
         </main>
         <div className="fixed bottom-0 w-full bg-stone-50/90 backdrop-blur-md p-4 border-t border-outline-variant/20">
-          <form onSubmit={handleOnboardingSubmit} className="max-w-3xl mx-auto flex gap-3">
-            <input
-              type="text"
+          <form onSubmit={handleOnboardingSubmit} className="max-w-3xl mx-auto flex gap-3 items-end">
+            <textarea
               value={onboardingInput}
               onChange={e => setOnboardingInput(e.target.value)}
+              onKeyDown={e => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  handleOnboardingSubmit(e as any);
+                }
+              }}
               disabled={isOnboardingLoading}
-              placeholder="メッセージを入力..."
-              className="flex-1 bg-surface-container-highest border-none rounded-full px-6 py-4 focus:ring-2 focus:ring-primary"
+              placeholder="メッセージを入力... (改行: Enter / 送信設定: 送信ボタンまたはCmd+Enter)"
+              rows={3}
+              className="flex-1 bg-surface-container-highest border-none rounded-2xl px-6 py-4 focus:ring-2 focus:ring-primary resize-y"
             />
-            <button type="submit" disabled={isOnboardingLoading || !onboardingInput.trim()} className="bg-primary text-on-primary w-14 h-14 rounded-full flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-50">
+            <button type="submit" disabled={isOnboardingLoading || !onboardingInput.trim()} className="bg-primary text-on-primary w-14 h-14 rounded-full flex items-center justify-center shrink-0 hover:scale-105 transition-transform disabled:opacity-50">
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>send</span>
             </button>
           </form>
@@ -1367,16 +1372,21 @@ export default function App() {
             </div>
 
             <div className="p-4 bg-surface-container-lowest border-t border-outline-variant/20">
-              <form onSubmit={handleSosSubmit} className="flex gap-3">
-                <input
-                  type="text"
+              <form onSubmit={handleSosSubmit} className="flex gap-3 items-end">
+                <textarea
                   value={sosInput}
                   onChange={e => setSosInput(e.target.value)}
+                  onKeyDown={e => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                      handleSosSubmit(e as any);
+                    }
+                  }}
                   disabled={isSosLoading}
-                  placeholder="今の気持ちを吐き出す..."
-                  className="flex-1 bg-surface-container-high border-none rounded-full px-6 py-3 focus:ring-2 focus:ring-secondary"
+                  placeholder="今の気持ちを吐き出す... (改行: Enter / 送信設定: 送信ボタンまたはCmd+Enter)"
+                  rows={3}
+                  className="flex-1 bg-surface-container-high border-none rounded-2xl px-6 py-3 focus:ring-2 focus:ring-secondary resize-y"
                 />
-                <button type="submit" disabled={isSosLoading || !sosInput.trim()} className="bg-secondary text-on-secondary w-12 h-12 rounded-full flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-50">
+                <button type="submit" disabled={isSosLoading || !sosInput.trim()} className="bg-secondary text-on-secondary w-12 h-12 rounded-full flex items-center justify-center shrink-0 hover:scale-105 transition-transform disabled:opacity-50">
                   <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>send</span>
                 </button>
               </form>
